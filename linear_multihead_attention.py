@@ -271,19 +271,20 @@ def linear_multi_head_attention_forward(query,                           # type:
         v = static_v
 
     src_len = k.size(1)
+    # key_padding_mask projection ???
+    if key_padding_mask is not None:
+        key_padding_mask = linear(key_padding_mask.float(), e_proj_weight).to(torch.bool)
+        assert key_padding_mask.size(0) == bsz
+        assert key_padding_mask.size(1) == src_len
 
-    # if key_padding_mask is not None:
-    #     assert key_padding_mask.size(0) == bsz
-    #     assert key_padding_mask.size(1) == src_len
-
-    # if add_zero_attn:
-    #     src_len += 1
-    #     k = torch.cat([k, torch.zeros((k.size(0), 1) + k.size()[2:], dtype=k.dtype, device=k.device)], dim=1)
-    #     v = torch.cat([v, torch.zeros((v.size(0), 1) + v.size()[2:], dtype=v.dtype, device=v.device)], dim=1)
-    #     if attn_mask is not None:
-    #         attn_mask = pad(attn_mask, (0, 1))
-    #     if key_padding_mask is not None:
-    #         key_padding_mask = pad(key_padding_mask, (0, 1))
+    if add_zero_attn:
+        src_len += 1
+        k = torch.cat([k, torch.zeros((k.size(0), 1) + k.size()[2:], dtype=k.dtype, device=k.device)], dim=1)
+        v = torch.cat([v, torch.zeros((v.size(0), 1) + v.size()[2:], dtype=v.dtype, device=v.device)], dim=1)
+        if attn_mask is not None:
+            attn_mask = pad(attn_mask, (0, 1))
+        if key_padding_mask is not None:
+            key_padding_mask = pad(key_padding_mask, (0, 1))
     
     attn_output_weights = torch.bmm(q, k.transpose(1, 2))
     assert list(attn_output_weights.size()) == [bsz * num_heads, tgt_len, src_len]
@@ -295,20 +296,19 @@ def linear_multi_head_attention_forward(query,                           # type:
             attn_output_weights += attn_mask
 
 
-    # if key_padding_mask is not None:
-    #     attn_output_weights = attn_output_weights.view(bsz, num_heads, tgt_len, src_len)
-    #     attn_output_weights = attn_output_weights.masked_fill(
-    #         key_padding_mask.unsqueeze(1).unsqueeze(2),
-    #         float('-inf'),
-    #     )
-    #     attn_output_weights = attn_output_weights.view(bsz * num_heads, tgt_len, src_len)
+    if key_padding_mask is not None:
+        attn_output_weights = attn_output_weights.view(bsz, num_heads, tgt_len, src_len)
+        attn_output_weights = attn_output_weights.masked_fill(
+            key_padding_mask.unsqueeze(1).unsqueeze(2),
+            float('-inf'),
+        )
+        attn_output_weights = attn_output_weights.view(bsz * num_heads, tgt_len, src_len)
 
     attn_output_weights = softmax(
         attn_output_weights, dim=-1)
     attn_output_weights = dropout(attn_output_weights, p=dropout_p, training=training)
 
-    # import pdb; pdb.set_trace()
-    attn_output = torch.bmm(attn_output_weights, v) # 8x4096x48, v:8x128x48,
+    attn_output = torch.bmm(attn_output_weights, v) 
     assert list(attn_output.size()) == [bsz * num_heads, tgt_len, head_dim]
     attn_output = attn_output.transpose(0, 1).contiguous().view(tgt_len, bsz, embed_dim)
     attn_output = linear(attn_output, out_proj_weight, out_proj_bias)
