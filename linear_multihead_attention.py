@@ -272,10 +272,10 @@ def linear_multi_head_attention_forward(query,                           # type:
 
     src_len = k.size(1)
     # key_padding_mask projection ???
-    if key_padding_mask is not None:
-        key_padding_mask = linear(key_padding_mask.float(), e_proj_weight).to(torch.bool)
-        assert key_padding_mask.size(0) == bsz
-        assert key_padding_mask.size(1) == src_len
+    # if key_padding_mask is not None:
+    #     key_padding_mask = linear(key_padding_mask.float(), e_proj_weight).to(torch.bool)
+    #     assert key_padding_mask.size(0) == bsz
+    #     assert key_padding_mask.size(1) == src_len
 
     if add_zero_attn:
         src_len += 1
@@ -296,13 +296,13 @@ def linear_multi_head_attention_forward(query,                           # type:
             attn_output_weights += attn_mask
 
 
-    if key_padding_mask is not None:
-        attn_output_weights = attn_output_weights.view(bsz, num_heads, tgt_len, src_len)
-        attn_output_weights = attn_output_weights.masked_fill(
-            key_padding_mask.unsqueeze(1).unsqueeze(2),
-            float('-inf'),
-        )
-        attn_output_weights = attn_output_weights.view(bsz * num_heads, tgt_len, src_len)
+    # if key_padding_mask is not None:
+    #     attn_output_weights = attn_output_weights.view(bsz, num_heads, tgt_len, src_len)
+    #     attn_output_weights = attn_output_weights.masked_fill(
+    #         key_padding_mask.unsqueeze(1).unsqueeze(2),
+    #         float('-inf'),
+    #     )
+    #     attn_output_weights = attn_output_weights.view(bsz * num_heads, tgt_len, src_len)
 
     attn_output_weights = softmax(
         attn_output_weights, dim=-1)
